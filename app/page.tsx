@@ -5,8 +5,6 @@ import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   onAuthStateChanged, 
-  signInAnonymously,
-  signInWithCustomToken,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -22,24 +20,19 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 
-// --- INICJALIZACJA FIREBASE ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : { 
-      apiKey: "AIzaSy_dummy_key_for_local_environment_do_not_use", 
-      authDomain: "dummy.firebaseapp.com", 
-      projectId: "dummy-project", 
-      storageBucket: "dummy.appspot.com", 
-      messagingSenderId: "123456789", 
-      appId: "1:123456789:web:abcdef" 
-    };
-
-const isLocalMock = !firebaseConfig.apiKey || firebaseConfig.apiKey.includes('dummy');
+// --- PRAWDZIWA INICJALIZACJA FIREBASE ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAQ1XchHuY_ALxIB6QhsMsBPo1tt6DLscg",
+  authDomain: "sayart-pro.firebaseapp.com",
+  projectId: "sayart-pro",
+  storageBucket: "sayart-pro.firebasestorage.app",
+  messagingSenderId: "91965841575",
+  appId: "1:91965841575:web:be44db46833032952b7b82"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'sayart-pro-v5';
 
 // --- KOMPONENTY POWIADOMIEŃ ---
 const Alert = ({ msg, type = 'success' }: { msg: string, type?: 'success' | 'error' }) => (
@@ -57,13 +50,11 @@ const Calculator = ({
   listwy, 
   settings, 
   user, 
-  isMock,
   onSaveSettings 
 }: { 
   listwy: any[], 
   settings: any, 
   user: User, 
-  isMock: boolean,
   onSaveSettings: (s: any) => void 
 }) => {
   const [localSettings, setLocalSettings] = useState(settings);
@@ -76,7 +67,6 @@ const Calculator = ({
     setTimeout(() => setAlert(null), 3000);
   };
 
-  // Stany formularza
   const [form, setForm] = useState({
     nr: '1/2026',
     data: new Date().toISOString().split('T')[0],
@@ -90,15 +80,15 @@ const Calculator = ({
     maPp: false
   });
 
-  // Pobieranie Archiwum
+  // Pobieranie Archiwum Zleceń z Prawdziwej Bazy
   useEffect(() => {
-    if (!user || isMock) return; 
-    const ordersRef = collection(db, 'artifacts', appId, 'users', user.uid, 'orders');
+    if (!user) return; 
+    const ordersRef = collection(db, 'users', user.uid, 'orders');
     const unsubOrders = onSnapshot(ordersRef, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (error) => console.error("Orders Snapshot Error:", error));
     return () => unsubOrders();
-  }, [user, isMock]);
+  }, [user]);
 
   // Logika obliczeń
   const results = useMemo(() => {
@@ -148,30 +138,19 @@ const Calculator = ({
   const handleSave = async (isNew: boolean) => {
     if (!user) { showAlert("Brak autoryzacji.", "error"); return; }
     const data = { ...form, total: results?.total, updatedAt: new Date().toISOString() };
-    
-    if (isMock) {
-      if (editingId) {
-        setOrders(orders.map(o => o.id === editingId ? { id: editingId, ...data } : o));
-        showAlert("Zaktualizowane (Tryb Demo)");
-      } else {
-        setOrders([...orders, { id: Math.random().toString(), ...data }]);
-        showAlert("Zapisane lokalnie (Tryb Demo)");
-      }
-      if (isNew) resetForm();
-      return;
-    }
 
     try {
       if (editingId) {
-        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'orders', editingId), data);
+        await setDoc(doc(db, 'users', user.uid, 'orders', editingId), data);
         showAlert("Zlecenie zaktualizowane pomyślnie");
       } else {
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'orders'), data);
+        await addDoc(collection(db, 'users', user.uid, 'orders'), data);
         showAlert("Zlecenie dodane do archiwum");
       }
       if (isNew) resetForm();
     } catch (e) { 
-      showAlert("Błąd zapisu zlecenia. Odśwież stronę.", "error"); 
+      showAlert("Błąd zapisu w chmurze.", "error"); 
+      console.error(e);
     }
   };
 
@@ -261,7 +240,7 @@ const Calculator = ({
             </button>
           </div>
 
-          {/* KARTA WYNIKÓW EKRANOWA (Ukryta na wydruku!) */}
+          {/* KARTA WYNIKÓW */}
           {results && (
             <div className="animate-in fade-in zoom-in-95 duration-500 print:hidden">
               <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
@@ -274,7 +253,7 @@ const Calculator = ({
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full print:hidden">
                       <button onClick={() => handleSave(false)} className="flex items-center justify-center gap-2 bg-white/10 p-4 rounded-2xl font-bold text-[10px] hover:bg-white/20 transition-all uppercase tracking-widest">
-                        <span className="text-sm">💾</span> {editingId ? 'Aktualizuj' : 'Zapisz'}
+                        <span className="text-sm">💾</span> {editingId ? 'Aktualizuj' : 'Zapisz w Chmurze'}
                       </button>
                       <button onClick={() => handleSave(true)} className="flex items-center justify-center gap-2 bg-blue-600 p-4 rounded-2xl font-bold text-[10px] hover:bg-blue-500 transition-all uppercase tracking-widest shadow-lg active:scale-95">
                         <span className="text-sm">➕</span> Zapisz i Nowe
@@ -290,7 +269,7 @@ const Calculator = ({
         </div>
       </div>
 
-      {/* ARCHIWUM Z ROZWIJANYM PANELEM */}
+      {/* ROZWIJANE ARCHIWUM */}
       {orders.length > 0 && (
         <details className="group print:hidden mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <summary className="cursor-pointer p-5 bg-white rounded-[2rem] shadow-sm flex justify-between items-center font-black text-[10px] uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all select-none border border-slate-100">
@@ -303,7 +282,7 @@ const Calculator = ({
           <div className="p-6 md:p-8 bg-white border-t border-slate-100 rounded-b-[2rem] mt-1 shadow-inner">
             <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {orders.sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).map(o => (
-                <div key={o.id} className="group bg-slate-50 p-4 rounded-2xl border-2 border-transparent hover:border-blue-500 transition-all flex justify-between items-center">
+                <div className="group bg-slate-50 p-4 rounded-2xl border-2 border-transparent hover:border-blue-500 transition-all flex justify-between items-center" key={o.id}>
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-white shadow-sm rounded-xl flex items-center justify-center text-slate-400 font-bold text-[10px] group-hover:text-blue-600 transition-colors">
                       {o.nr}
@@ -318,9 +297,8 @@ const Calculator = ({
                       <span className="text-sm">✏️</span>
                     </button>
                     <button onClick={async () => { 
-                      if(!confirm("Trwale usunąć zlecenie?")) return;
-                      if (isMock) { setOrders(orders.filter(item => item.id !== o.id)); return; }
-                      await deleteDoc(doc(db, 'artifacts', appId, 'users', user!.uid, 'orders', o.id)); 
+                      if(!confirm("Trwale usunąć zlecenie z chmury?")) return;
+                      await deleteDoc(doc(db, 'users', user.uid, 'orders', o.id)); 
                     }} className="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-colors">
                       <span className="text-sm">🗑️</span>
                     </button>
@@ -332,9 +310,9 @@ const Calculator = ({
         </details>
       )}
 
-      {/* USTAWIENIA WARSZTATU */}
+      {/* USTAWIENIA WARSZTATU Z ROZBUDOWANYM CENNIKIEM */}
       <details className="group print:hidden mb-12">
-        <summary className="cursor-pointer p-5 bg-white rounded-[2rem] shadow-sm flex justify-between items-center font-black text-[10px] uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all select-none border border-slate-100">
+        <summary className="cursor-pointer p-5 bg-white rounded-[2rem] shadow-md flex justify-between items-center font-black text-[10px] uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all select-none border border-slate-100">
            <div className="flex items-center gap-3"><span className="text-xl leading-none">⚙️</span> Konfiguracja Warsztatu i Bazy</div>
            <span className="group-open:rotate-180 transition-transform inline-block">▼</span>
         </summary>
@@ -395,10 +373,10 @@ const Calculator = ({
 
           <button onClick={() => {
             onSaveSettings(localSettings);
-            showAlert("Konfiguracja warsztatu zapisana!");
+            showAlert("Profil ramiarza został zsynchronizowany z chmurą!");
           }} 
             className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-blue-700 transition-all active:scale-95 mt-4">
-            Zapisz Profil Ramiarza
+            Zapisz Ustawienia
           </button>
         </div>
       </details>
@@ -407,7 +385,7 @@ const Calculator = ({
       <div className="hidden print:block print-document bg-white text-black">
          <div className="border-b-4 border-slate-900 pb-4 mb-6 flex justify-between items-start">
             <div>
-              <h2 className="text-3xl font-black uppercase text-slate-900 leading-tight">{localSettings?.shopName}</h2>
+              <h2 className="text-4xl font-black uppercase text-slate-900 leading-tight">{localSettings?.shopName}</h2>
               <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{localSettings?.shopAddress}</p>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Tel: {localSettings?.shopPhone || '---'} | Email: {localSettings?.shopEmail || '---'}</p>
             </div>
@@ -443,7 +421,7 @@ const Calculator = ({
            </div>
          )}
 
-         {/* ODCINEK DLA KLIENTA - Zmniejszony margines z mt-40 na mt-12, żeby zmieścić na jednej stronie */}
+         {/* ODCINEK DLA KLIENTA */}
          <div className="mt-12 border-t-2 border-dashed border-slate-400 pt-6 relative">
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-4 text-slate-400"><span className="text-2xl">✂️</span></div>
             <div className="flex justify-between items-start">
@@ -478,8 +456,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<any>(null);
 
-  // Stany logowania e-mailem
-  const [view, setView] = useState<'app' | 'login' | 'register'>('app');
+  const [view, setView] = useState<'app' | 'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -494,26 +471,9 @@ export default function App() {
 
   // INIT AUTH
   useEffect(() => {
-    const init = async () => {
-      try {
-        if (!isLocalMock && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          // Brak tokenu
-        }
-      } catch (e) {
-        console.error("Auth Error:", e);
-      }
-    };
-    init();
-
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (!u || u.isAnonymous) {
-         setView('login');
-      } else {
-         setView('app');
-      }
+      if (u) setView('app');
       setLoading(false);
     });
     return () => unsub();
@@ -522,17 +482,10 @@ export default function App() {
   // FETCH SETTINGS
   useEffect(() => {
     if (!user) return;
-
-    if (isLocalMock) {
-      setSettings({
-        shopName: 'Pracownia Demo', shopAddress: 'ul. Przykładowa 1', shopPhone: '123 456 789', shopEmail: 'biuro@demo.pl',
-        discountSayart: '10', marginRama: '100', marginMetr: '150', marginSzklo: '150', marginTyl: '150',
-        priceFloat: '60', priceAnty: '90', pricePlexi: '120', priceHdf: '25', priceKarton: '15'
-      });
-      return;
-    }
-
-    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile');
+    
+    // Ścieżki Firestore od razu pod konkretnego użytkownika Firebase
+    const profileRef = doc(db, 'users', user.uid, 'settings', 'profile');
+    
     const unsubProfile = onSnapshot(profileRef, (snap) => {
       if (snap.exists()) {
         setSettings(snap.data());
@@ -556,12 +509,6 @@ export default function App() {
     e.preventDefault();
     setAuthError('');
     try {
-      if (isLocalMock) {
-        setUser({ uid: 'dev-123', email: email, isAnonymous: false } as User);
-        setView('app');
-        return;
-      }
-
       if (view === 'login') {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
@@ -569,21 +516,10 @@ export default function App() {
       }
       setView('app');
     } catch (err: any) {
-      setAuthError("Błąd autoryzacji: Sprawdź poprawność danych (hasło min. 6 znaków).");
+      if (err.code === 'auth/invalid-credential') setAuthError("Błędny email lub hasło.");
+      else if (err.code === 'auth/email-already-in-use') setAuthError("Ten e-mail jest już zajęty.");
+      else setAuthError("Błąd logowania. Hasło musi mieć min. 6 znaków.");
     }
-  };
-
-  const handleSkipLogin = async () => {
-    if (!isLocalMock) {
-      try {
-        await signInAnonymously(auth);
-      } catch(e) {
-        console.error("Anon Login Error", e);
-      }
-    } else {
-      setUser({ uid: 'dev-anon', isAnonymous: true } as User);
-    }
-    setView('app');
   };
 
   if (!mounted || loading) return (
@@ -592,7 +528,7 @@ export default function App() {
          <div className="w-16 h-16 bg-blue-600 rounded-[1.5rem] animate-spin mx-auto mb-6 flex items-center justify-center rotate-45 shadow-xl">
             <span className="text-white font-black text-3xl rotate-[-45deg] italic">S</span>
          </div>
-         <p className="font-black uppercase tracking-[0.4em] text-[10px] text-slate-400">System Start...</p>
+         <p className="font-black uppercase tracking-[0.4em] text-[10px] text-slate-400">Ładowanie Sayart...</p>
       </div>
     </div>
   );
@@ -610,7 +546,7 @@ export default function App() {
               </div>
             </div>
             <h2 className="text-3xl font-black text-center text-slate-800 mb-2 uppercase tracking-tighter">Sayart Pro</h2>
-            <p className="text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">Panel Wycen Ramiarza</p>
+            <p className="text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">Dostęp dla ramiarzy</p>
             
             <form onSubmit={handleManualAuth} className="space-y-4">
               {authError && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-bold text-center border border-red-100">{authError}</div>}
@@ -619,17 +555,13 @@ export default function App() {
               <input type="password" placeholder="Hasło" required className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-slate-50 focus:bg-white focus:border-blue-500 outline-none transition-all text-sm font-medium" value={password} onChange={e => setPassword(e.target.value)} />
               
               <button className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-black transition-all uppercase text-[11px] tracking-widest active:scale-95">
-                {view === 'login' ? 'Zaloguj Bezpiecznie' : 'Załóż Nowe Konto'}
+                {view === 'login' ? 'Zaloguj Bezpiecznie' : 'Zarejestruj Pracownię'}
               </button>
             </form>
 
             <div className="mt-8 flex flex-col items-center gap-3">
               <button onClick={() => setView(view === 'login' ? 'register' : 'login')} className="text-blue-600 text-[10px] font-black uppercase hover:underline underline-offset-4 transition-all">
-                {view === 'login' ? 'Nie masz profilu? Utwórz konto' : 'Masz profil? Wróć do logowania'}
-              </button>
-              <div className="h-px w-full bg-slate-100 my-2" />
-              <button onClick={handleSkipLogin} className="text-slate-400 hover:text-slate-600 text-[9px] font-black uppercase tracking-widest transition-all">
-                Kontynuuj bez logowania (Tryb Demo)
+                {view === 'login' ? 'Nie masz konta? Zarejestruj się za darmo' : 'Masz już konto? Wróć do logowania'}
               </button>
             </div>
           </div>
@@ -647,12 +579,10 @@ export default function App() {
               </div>
               <div>
                 <h1 className="text-3xl font-black tracking-tighter uppercase leading-none">Sayart Pro</h1>
-                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-1">
-                  {user?.isAnonymous || isLocalMock ? 'Tryb Lokalny (Offline)' : user?.email}
-                </p>
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-1">Połączono z chmurą</p>
               </div>
             </div>
-            {(!user?.isAnonymous && !isLocalMock) && (
+            {user && (
               <button onClick={() => { signOut(auth); setView('login'); }} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-800 bg-white px-5 py-3 rounded-xl shadow-sm transition-all active:scale-95">
                 Wyloguj
               </button>
@@ -665,13 +595,9 @@ export default function App() {
               listwy={listwyDemo} 
               settings={settings} 
               user={user!}
-              isMock={isLocalMock || user?.isAnonymous || false}
+              isMock={false}
               onSaveSettings={(newS) => {
-                if (isLocalMock || user?.isAnonymous) {
-                   setSettings(newS);
-                   return;
-                }
-                setDoc(doc(db, 'artifacts', appId, 'users', user!.uid, 'settings', 'profile'), newS)
+                setDoc(doc(db, 'users', user!.uid, 'settings', 'profile'), newS)
                   .catch(e => console.error("Error saving settings", e));
               }}
             />
