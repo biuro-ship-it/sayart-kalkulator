@@ -1,45 +1,106 @@
-"use client"; // To mówi Next.js, że to jest interaktywny element (Client Component)
+"use client";
 
 import { useState } from 'react';
 
 export default function Calculator({ listwy }: { listwy: any[] }) {
+  // 1. ZAMÓWIENIE KLIENTA
   const [wybranaListwaId, setWybranaListwaId] = useState(listwy[0]?.id || '');
   const [szerokosc, setSzerokosc] = useState('');
   const [wysokosc, setWysokosc] = useState('');
+  const [rodzajOszklenia, setRodzajOszklenia] = useState('float');
 
-  // Znajdujemy pełne dane wybranej listwy
+  // Passe-partout
+  const [maPassepartout, setMaPassepartout] = useState(false);
+  const [marginesPp, setMarginesPp] = useState('5');
+  const [cenaPpM2, setCenaPpM2] = useState('80');
+
+  // 2. CENNIK MATERIAŁÓW RAMIARZA (Z domyślnymi cenami hurtowymi za m2)
+  const [cenaSzkloFloat, setCenaSzkloFloat] = useState('60'); 
+  const [cenaSzkloAnty, setCenaSzkloAnty] = useState('90');
+  const [cenaPlexi, setCenaPlexi] = useState('120');
+  const [cenaHdfM2, setCenaHdfM2] = useState('25');     
+  const [marzaProcent, setMarzaProcent] = useState('100'); 
+
   const listwa = listwy.find((l) => l.id.toString() === wybranaListwaId.toString());
 
-  // Zmienne do wyników
+  // Zmienne wynikowe
   let zuzycieMb = 0;
-  let cenaMaterialu = 0;
-  let cenaZlozona = 0;
+  let poleM2 = 0;
+  let s_ramy = 0; 
+  let w_ramy = 0; 
+  
+  let kosztHurtRama = 0;
+  let kosztHurtOszklenie = 0;
+  let kosztHurtHdf = 0;
+  let kosztHurtPp = 0;
+  
+  let nazwaOszklenia = "";
+  let kosztCalkowityHurt = 0;
+  let cenaDetaliczna = 0;
 
-  // Główny wzór matematyczny Sayart
   if (listwa && szerokosc && wysokosc) {
-    const s = parseFloat(szerokosc);
-    const w = parseFloat(wysokosc);
+    const s_obrazu = parseFloat(szerokosc);
+    const w_obrazu = parseFloat(wysokosc);
+    const hdfM2 = parseFloat(cenaHdfM2) || 0;
+    const marza = parseFloat(marzaProcent) || 0;
 
-    if (!isNaN(s) && !isNaN(w)) {
+    if (!isNaN(s_obrazu) && !isNaN(w_obrazu)) {
+      
+      // LOGIKA PASSE-PARTOUT
+      if (maPassepartout) {
+        const margines = parseFloat(marginesPp) || 0;
+        s_ramy = s_obrazu + (2 * margines);
+        w_ramy = w_obrazu + (2 * margines);
+      } else {
+        s_ramy = s_obrazu;
+        w_ramy = w_obrazu;
+      }
+
+      // RAMA
       const listwaSzerCm = listwa.szerokosc_mm / 10;
-      // 2*(S+W) + 8 uciosów (szerokości listwy)
-      const zuzycieCm = 2 * (s + w) + (8 * listwaSzerCm);
+      const zuzycieCm = 2 * (s_ramy + w_ramy) + (8 * listwaSzerCm);
       zuzycieMb = zuzycieCm / 100;
+      kosztHurtRama = zuzycieMb * listwa.cena_zlozona_hurt;
 
-      cenaMaterialu = zuzycieMb * listwa.cena_mb_hurt;
-      cenaZlozona = zuzycieMb * listwa.cena_zlozona_hurt;
+      // POWIERZCHNIA M2 (do szkła, pleców i PP)
+      poleM2 = (s_ramy * w_ramy) / 10000;
+
+      // OSZKLENIE - dobieramy cenę na podstawie wyboru z listy
+      let cenaOszkleniaM2 = 0;
+      if (rodzajOszklenia === 'float') { cenaOszkleniaM2 = parseFloat(cenaSzkloFloat) || 0; nazwaOszklenia = "Szkło Float"; }
+      else if (rodzajOszklenia === 'szklo_anty') { cenaOszkleniaM2 = parseFloat(cenaSzkloAnty) || 0; nazwaOszklenia = "Szkło Antyrefleks"; }
+      else if (rodzajOszklenia === 'plexi') { cenaOszkleniaM2 = parseFloat(cenaPlexi) || 0; nazwaOszklenia = "Plexi"; }
+      else if (rodzajOszklenia === 'brak') { cenaOszkleniaM2 = 0; nazwaOszklenia = "Bez oszklenia"; }
+
+      kosztHurtOszklenie = poleM2 * cenaOszkleniaM2;
+
+      // PLECY HDF
+      kosztHurtHdf = poleM2 * hdfM2;
+
+      // PASSE-PARTOUT
+      if (maPassepartout) {
+        const ppM2 = parseFloat(cenaPpM2) || 0;
+        kosztHurtPp = poleM2 * ppM2;
+      }
+
+      // PODSUMOWANIE
+      kosztCalkowityHurt = kosztHurtRama + kosztHurtOszklenie + kosztHurtHdf + kosztHurtPp;
+      cenaDetaliczna = kosztCalkowityHurt * (1 + (marza / 100));
     }
   }
 
   return (
-    <div className="bg-blue-50 p-6 rounded-lg border border-blue-100 mb-8">
-      <h3 className="text-xl font-bold text-blue-800 mb-4">Kalkulator Oprawy</h3>
+    <div className="mb-4">
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div>
+      {/* SEKCJA 1: WYMIARY I LISTWA */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 bg-blue-50 p-4 rounded">
+        <div className="md:col-span-2 lg:col-span-4 border-b border-blue-200 pb-2 mb-2">
+          <h4 className="font-bold text-blue-800 uppercase text-sm tracking-wider">1. Obraz i Rama</h4>
+        </div>
+        <div className="lg:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Wybierz listwę</label>
           <select 
-            className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
             value={wybranaListwaId}
             onChange={(e) => setWybranaListwaId(e.target.value)}
           >
@@ -48,7 +109,6 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
             ))}
           </select>
         </div>
-        
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Szerokość obrazu (cm)</label>
           <input 
@@ -59,7 +119,6 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
             onChange={(e) => setSzerokosc(e.target.value)}
           />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Wysokość obrazu (cm)</label>
           <input 
@@ -70,15 +129,12 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
             onChange={(e) => setWysokosc(e.target.value)}
           />
         </div>
-      </div>
-
-      {zuzycieMb > 0 && (
-        <div className="bg-white p-4 rounded border border-green-200 shadow-inner">
-          <p className="text-gray-600 mb-1">Zapotrzebowanie materiału: <strong className="text-black">{zuzycieMb.toFixed(2)} mb</strong></p>
-          <p className="text-gray-600 mb-1">Koszt samej listwy (hurt): <strong className="text-black">{cenaMaterialu.toFixed(2)} zł</strong></p>
-          <p className="text-lg text-green-700 mt-2">Cena ramy złożonej (hurt): <strong>{cenaZlozona.toFixed(2)} zł</strong></p>
-        </div>
-      )}
-    </div>
-  );
-}
+        <div className="lg:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Rodzaj Oszklenia</label>
+          <select 
+            className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
+            value={rodzajOszklenia}
+            onChange={(e) => setRodzajOszklenia(e.target.value)}
+          >
+            <option value="float">Szkło Float</option>
+            <option value="sz
