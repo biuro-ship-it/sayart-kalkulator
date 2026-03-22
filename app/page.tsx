@@ -1,16 +1,20 @@
 import pool from '../lib/db';
+import Calculator from './Calculator'; // Importujemy nasz nowy kalkulator!
 
 export default async function Home() {
-  // Pobieramy dane z nowej bazy MySQL
   const [rows] = await pool.query('SELECT * FROM cennik_sayart ORDER BY id ASC');
-  const listwy = rows as any[]; // Pomocnik dla TypeScripta
+  const listwy = rows as any[];
 
   return (
     <main className="min-h-screen p-8 bg-gray-50 text-gray-900 font-sans">
       <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
         <h1 className="text-3xl font-bold mb-2 text-blue-700">Sayart</h1>
-        <h2 className="text-xl mb-6 text-gray-600">Panel Ramiarza - Twój Cennik:</h2>
+        <h2 className="text-xl mb-6 text-gray-600">Panel Ramiarza</h2>
 
+        {/* Wstawiamy nasz interaktywny kalkulator i przekazujemy mu dane z bazy */}
+        <Calculator listwy={listwy} />
+
+        <h3 className="text-lg font-bold text-gray-700 mb-3 mt-8">Twój pełny cennik:</h3>
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse border border-gray-200">
             <thead className="bg-gray-100">
