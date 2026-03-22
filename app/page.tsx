@@ -17,7 +17,7 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
 
   // 3. PARAMETRY KLIENTA
   const [wybranaListwaId, setWybranaListwaId] = useState('');
-  const [typOprawy, setTypOprawy] = useState('rama'); 
+  const [typOprawy, setTypOprawy] = useState('rama'); // 'rama' = W oprawie, 'listwa' = Z metra
   const [szerokosc, setSzerokosc] = useState('');
   const [wysokosc, setWysokosc] = useState('');
   const [rodzajOszklenia, setRodzajOszklenia] = useState('float');
@@ -28,13 +28,19 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
   const [marginesPp, setMarginesPp] = useState('5');
   const [cenaPpM2, setCenaPpM2] = useState('80');
 
-  // 4. CENNIK WARSZTATOWY (Float, Antyrefleks, Plexi, HDF, Karton)
+  // 4. CENNIK I INDYWIDUALNE MARŻE (%)
   const [cenaSzkloFloat, setCenaSzkloFloat] = useState('60'); 
   const [cenaSzkloAnty, setCenaSzkloAnty] = useState('90');
   const [cenaPlexi, setCenaPlexi] = useState('120');
   const [cenaHdfM2, setCenaHdfM2] = useState('25');     
   const [cenaKartonTylM2, setCenaKartonTylM2] = useState('15');
-  const [marzaProcent, setMarzaProcent] = useState('100'); 
+
+  const [marzaListwaRama, setMarzaListwaRama] = useState('100');
+  const [marzaListwaMetr, setMarzaListwaMetr] = useState('150');
+  
+  const [marzaSzklo, setMarzaSzklo] = useState('150');
+  const [marzaTyl, setMarzaTyl] = useState('150');
+  const [marzaPp, setMarzaPp] = useState('150');
 
   useEffect(() => {
     if (listwy.length > 0 && !wybranaListwaId) {
@@ -57,22 +63,35 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
       zuzycieMb = (2 * (s_ramy + w_ramy) + (8 * (listwa.szerokosc_mm / 10))) / 100;
       poleM2 = (s_ramy * w_ramy) / 10000;
 
-      const cenaRama = typOprawy === 'rama' ? listwa.cena_zlozona_hurt : listwa.cena_mb_hurt;
+      // Logika wybrana przez użytkownika: W oprawie (rama_złożona) vs Z metra (cena_mb)
+      const cenaHurtRamaElement = typOprawy === 'rama' ? listwa.cena_zlozona_hurt : listwa.cena_mb_hurt;
+      const marzaDlaListwy = typOprawy === 'rama' ? parseFloat(marzaListwaRama) : parseFloat(marzaListwaMetr);
+      
+      const kosztHurtRama = zuzycieMb * cenaHurtRamaElement;
 
-      let cSzklo = 0;
-      if (rodzajOszklenia === 'float') { cSzklo = parseFloat(cenaSzkloFloat); nazwaOszklenia = "Szkło Float"; }
-      else if (rodzajOszklenia === 'szklo_anty') { cSzklo = parseFloat(cenaSzkloAnty); nazwaOszklenia = "Szkło Antyrefleks"; }
-      else if (rodzajOszklenia === 'plexi') { cSzklo = parseFloat(cenaPlexi); nazwaOszklenia = "Plexi"; }
+      let cSzkloHurt = 0;
+      if (rodzajOszklenia === 'float') { cSzkloHurt = parseFloat(cenaSzkloFloat); nazwaOszklenia = "Szkło Float"; }
+      else if (rodzajOszklenia === 'szklo_anty') { cSzkloHurt = parseFloat(cenaSzkloAnty); nazwaOszklenia = "Szkło Antyrefleks"; }
+      else if (rodzajOszklenia === 'plexi') { cSzkloHurt = parseFloat(cenaPlexi); nazwaOszklenia = "Plexi"; }
       else nazwaOszklenia = "Brak";
+      const kosztHurtSzklo = poleM2 * cSzkloHurt;
 
-      let cTyl = 0;
-      if (rodzajTylu === 'hdf') { cTyl = parseFloat(cenaHdfM2); nazwaTylu = "HDF"; }
-      else if (rodzajTylu === 'karton') { cTyl = parseFloat(cenaKartonTylM2); nazwaTylu = "Karton"; }
+      let cTylHurt = 0;
+      if (rodzajTylu === 'hdf') { cTylHurt = parseFloat(cenaHdfM2); nazwaTylu = "HDF"; }
+      else if (rodzajTylu === 'karton') { cTylHurt = parseFloat(cenaKartonTylM2); nazwaTylu = "Karton"; }
       else nazwaTylu = "Brak";
+      const kosztHurtTyl = poleM2 * cTylHurt;
 
-      const kosztPp = maPassepartout ? poleM2 * parseFloat(cenaPpM2) : 0;
-      kosztCalkowityHurt = (zuzycieMb * cenaRama) + (poleM2 * cSzklo) + (poleM2 * cTyl) + kosztPp;
-      cenaDetaliczna = kosztCalkowityHurt * (1 + (parseFloat(marzaProcent) / 100));
+      const kosztHurtPp = maPassepartout ? poleM2 * parseFloat(cenaPpM2) : 0;
+      
+      kosztCalkowityHurt = kosztHurtRama + kosztHurtSzklo + kosztHurtTyl + kosztHurtPp;
+
+      const cenaDetalRama = kosztHurtRama * (1 + marzaDlaListwy / 100);
+      const cenaDetalSzklo = kosztHurtSzklo * (1 + parseFloat(marzaSzklo) / 100);
+      const cenaDetalTyl = kosztHurtTyl * (1 + parseFloat(marzaTyl) / 100);
+      const cenaDetalPp = kosztHurtPp * (1 + parseFloat(marzaPp) / 100);
+
+      cenaDetaliczna = cenaDetalRama + cenaDetalSzklo + cenaDetalTyl + cenaDetalPp;
     }
   }
 
@@ -89,8 +108,8 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
         <div className="col-span-full flex justify-between items-center border-b border-blue-200 pb-2 mb-1 text-gray-800">
           <h4 className="font-bold text-blue-800 uppercase text-xs">1. Parametry zlecenia</h4>
           <div className="flex gap-2">
-            <input type="text" className="p-1 text-xs font-bold border rounded w-20 text-center shadow-sm" value={nrZlecenia} onChange={e => setNrZlecenia(e.target.value)} />
-            <input type="date" className="p-1 text-xs border rounded w-28 text-center shadow-sm" value={dataZlecenia} onChange={e => setDataZlecenia(e.target.value)} />
+            <input type="text" className="p-1 text-xs font-bold border rounded w-20 text-center shadow-sm" value={nrZlecenia} onChange={e => setNrZlecenia(e.target.value)} title="Nr zlecenia" />
+            <input type="date" className="p-1 text-xs border rounded w-28 text-center shadow-sm" value={dataZlecenia} onChange={e => setDataZlecenia(e.target.value)} title="Data" />
           </div>
         </div>
         <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500 mb-1 uppercase">Listwa</label>
@@ -98,8 +117,11 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
             {listwy.map((l) => <option key={l.id} value={l.id}>{l.kod} ({l.szerokosc_mm}mm)</option>)}
           </select>
         </div>
-        <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500 mb-1 uppercase">Typ</label>
-          <select className="p-2 text-sm rounded border bg-white text-gray-800 shadow-sm" value={typOprawy} onChange={e => setTypOprawy(e.target.value)}><option value="rama">Rama złożona</option><option value="listwa">Listwa z metra</option></select>
+        <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500 mb-1 uppercase">Typ oprawy</label>
+          <select className="p-2 text-sm rounded border bg-white text-gray-800 shadow-sm" value={typOprawy} onChange={e => setTypOprawy(e.target.value)}>
+            <option value="rama">W oprawie</option>
+            <option value="listwa">Z metra</option>
+          </select>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500 mb-1 uppercase">Szer. (cm)</label><input type="number" className="p-2 text-sm rounded border text-gray-800 shadow-sm" value={szerokosc} onChange={e => setSzerokosc(e.target.value)} /></div>
@@ -123,7 +145,7 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
       {/* 2. USTAWIENIA WARSZTATU I CEN (UKRYTE W DRUKU) */}
       <details className="group print:hidden text-gray-800 shadow-sm rounded-xl">
         <summary className="cursor-pointer p-3 rounded-xl bg-gray-100 border text-xs font-bold uppercase flex justify-between items-center hover:bg-gray-200 transition-colors">
-          <span>⚙️ Ustawienia warsztatu i cen</span>
+          <span>⚙️ Ustawienia warsztatu i marż</span>
           <span className="text-[10px] opacity-50 font-normal">Kliknij aby edytować</span>
         </summary>
         <div className="p-4 bg-white border-x border-b rounded-b-xl space-y-6">
@@ -135,79 +157,96 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
             <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500">Email</label><input className="p-1 border rounded text-xs" value={shopEmail} onChange={e => setShopEmail(e.target.value)} /></div>
             <div className="flex flex-col col-span-2"><label className="text-[10px] font-bold text-gray-500">WWW</label><input className="p-1 border rounded text-xs" value={shopWeb} onChange={e => setShopWeb(e.target.value)} /></div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="col-span-full font-bold text-gray-400 text-[10px] uppercase border-b pb-1">Cennik materiałów (zł/m²)</div>
-            <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500">Float</label><input type="number" className="p-1 border rounded text-xs" value={cenaSzkloFloat} onChange={e => setCenaSzkloFloat(e.target.value)} /></div>
-            <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500">Antyref.</label><input type="number" className="p-1 border rounded text-xs" value={cenaSzkloAnty} onChange={e => setCenaSzkloAnty(e.target.value)} /></div>
-            <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500">Plexi</label><input type="number" className="p-1 border rounded text-xs" value={cenaPlexi} onChange={e => setCenaPlexi(e.target.value)} /></div>
-            <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500">HDF</label><input type="number" className="p-1 border rounded text-xs" value={cenaHdfM2} onChange={e => setCenaHdfM2(e.target.value)} /></div>
-            <div className="flex flex-col"><label className="text-[10px] font-bold text-gray-500">Karton</label><input type="number" className="p-1 border rounded text-xs" value={cenaKartonTylM2} onChange={e => setCenaKartonTylM2(e.target.value)} /></div>
-            <div className="flex flex-col text-blue-700 font-bold"><label className="text-[10px] uppercase tracking-tighter">Marża %</label><input type="number" className="p-1 border-2 border-blue-100 rounded text-xs shadow-inner" value={marzaProcent} onChange={e => setMarzaProcent(e.target.value)} /></div>
+
+          <div className="space-y-4">
+             <div className="col-span-full font-bold text-gray-400 text-[10px] uppercase border-b pb-1">Cennik materiałów i marże komponentów</div>
+             
+             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+               <div className="p-2 bg-blue-50 rounded-lg border border-blue-100">
+                 <p className="text-[9px] font-bold text-blue-800 uppercase mb-1">Marża Listwy</p>
+                 <div className="grid grid-cols-2 gap-1">
+                   <div className="flex flex-col"><label className="text-[8px] text-gray-500 uppercase">W oprawie %</label><input type="number" className="p-0.5 border rounded text-[10px] font-bold" value={marzaListwaRama} onChange={e => setMarzaListwaRama(e.target.value)} /></div>
+                   <div className="flex flex-col"><label className="text-[8px] text-gray-500 uppercase">Z metra %</label><input type="number" className="p-0.5 border rounded text-[10px] font-bold" value={marzaListwaMetr} onChange={e => setMarzaListwaMetr(e.target.value)} /></div>
+                 </div>
+               </div>
+
+               <div className="p-2 bg-gray-50 rounded-lg border border-gray-200">
+                 <p className="text-[9px] font-bold text-gray-800 uppercase mb-1">Oszklenie</p>
+                 <div className="grid grid-cols-2 gap-1 mb-1">
+                   <div className="flex flex-col"><label className="text-[8px] text-gray-500">Float</label><input type="number" className="p-0.5 border rounded text-[10px]" value={cenaSzkloFloat} onChange={e => setCenaSzkloFloat(e.target.value)} /></div>
+                   <div className="flex flex-col"><label className="text-[8px] text-gray-500">Antyref.</label><input type="number" className="p-0.5 border rounded text-[10px]" value={cenaSzkloAnty} onChange={e => setCenaSzkloAnty(e.target.value)} /></div>
+                   <div className="flex flex-col"><label className="text-[8px] text-gray-500">Plexi</label><input type="number" className="p-0.5 border rounded text-[10px]" value={cenaPlexi} onChange={e => setCenaPlexi(e.target.value)} /></div>
+                 </div>
+                 <div className="flex flex-col border-t pt-1"><label className="text-[10px] text-gray-500 font-bold">Marża %</label><input type="number" className="p-0.5 border rounded text-[10px] font-bold text-blue-700" value={marzaSzklo} onChange={e => setMarzaSzklo(e.target.value)} /></div>
+               </div>
+
+               <div className="p-2 bg-gray-50 rounded-lg border border-gray-200">
+                 <p className="text-[9px] font-bold text-gray-800 uppercase mb-1">Tyły</p>
+                 <div className="grid grid-cols-2 gap-1 mb-1">
+                   <div className="flex flex-col"><label className="text-[8px] text-gray-500">HDF</label><input type="number" className="p-0.5 border rounded text-[10px]" value={cenaHdfM2} onChange={e => setCenaHdfM2(e.target.value)} /></div>
+                   <div className="flex flex-col"><label className="text-[8px] text-gray-500">Karton</label><input type="number" className="p-0.5 border rounded text-[10px]" value={cenaKartonTylM2} onChange={e => setCenaKartonTylM2(e.target.value)} /></div>
+                 </div>
+                 <div className="flex flex-col border-t pt-1"><label className="text-[10px] text-gray-500 font-bold">Marża %</label><input type="number" className="p-0.5 border rounded text-[10px] font-bold text-blue-700" value={marzaTyl} onChange={e => setMarzaTyl(e.target.value)} /></div>
+               </div>
+             </div>
           </div>
         </div>
       </details>
 
       {/* 3. WIDOK PODSUMOWANIA I DRUKU */}
       {zuzycieMb > 0 && (
-        <div className="mt-4 pt-4 border-t-2 text-gray-900 animate-in fade-in duration-300">
+        <div className="mt-2 pt-2 border-t-2 text-gray-900 animate-in fade-in duration-300">
           
-          {/* Nagłówek wydruku (Tylko Twoja Firma) */}
           <div className="hidden print:flex flex-col mb-8 border-b-4 border-black pb-4">
             <h2 className="text-3xl font-black uppercase leading-tight">{shopName}</h2>
             <p className="text-sm font-bold text-gray-700">{shopAddress}</p>
             <p className="text-xs text-gray-500">Tel: {shopPhone} | {shopWeb}</p>
             <div className="mt-4 text-right border-t-2 border-black/10 pt-2">
                <h3 className="text-xl font-black uppercase">POTWIERDZENIE ZLECENIA NR {nrZlecenia}</h3>
-               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Data przyjęcia: {dataZlecenia}</p>
+               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Data: {dataZlecenia}</p>
             </div>
           </div>
 
-          <div className="mb-4 p-4 border rounded-2xl bg-yellow-50 print:bg-white print:border-2 print:border-black shadow-sm flex items-center">
-            <div className="mr-4 text-2xl print:hidden">📏</div>
+          <div className="mb-3 p-3 border rounded-2xl bg-yellow-50 print:bg-white print:border-2 print:border-black shadow-sm flex items-center">
+            <div className="mr-3 text-xl print:hidden">📏</div>
             <div>
-              <span className="block text-[10px] font-bold uppercase text-gray-500 print:text-black">Wymiar zewnętrzny ramy (cięcie):</span>
-              <span className="text-2xl font-black">{s_ramy} x {w_ramy} cm</span>
+              <span className="block text-[9px] font-bold uppercase text-gray-500 print:text-black">Wymiar zewnętrzny ramy (roboczy):</span>
+              <span className="text-xl font-black">{s_ramy} x {w_ramy} cm</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-1">
-            <div className="text-sm space-y-1">
-              <p className="font-bold border-b pb-1 text-[10px] uppercase tracking-widest text-gray-400 print:text-black print:mb-2">Specyfikacja zamówienia:</p>
-              <div className="flex justify-between py-1.5"><span>Model listwy:</span><span className="font-bold">{listwa.kod} ({listwa.szerokosc_mm}mm)</span></div>
-              <div className="flex justify-between py-1.5 border-t border-gray-100"><span>Format obrazu:</span><span className="font-bold">{szerokosc} x {wysokosc} cm</span></div>
-              <div className="flex justify-between py-1.5 border-t border-gray-100"><span>Oszklenie:</span><span className="font-bold">{nazwaOszklenia}</span></div>
-              <div className="flex justify-between py-1.5 border-t border-gray-100"><span>Rodzaj tyłu:</span><span className="font-bold">{nazwaTylu}</span></div>
-              {maPassepartout && <div className="flex justify-between py-1.5 border-t border-gray-100"><span>Passe-partout:</span><span className="font-bold">TAK (+{marginesPp} cm)</span></div>}
-              {uwagi && <div className="mt-4 p-3 bg-gray-50 border-l-4 border-gray-300 italic text-xs print:border-black print:bg-gray-50"><strong>Uwagi:</strong> {uwagi}</div>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-1">
+            <div className="text-sm space-y-0.5">
+              <p className="font-bold border-b pb-1 text-[9px] uppercase tracking-widest text-gray-400 print:text-black print:mb-2">Specyfikacja:</p>
+              <div className="flex justify-between py-1"><span>Typ usługi:</span><span className="font-bold">{typOprawy === 'rama' ? 'W oprawie' : 'Z metra'}</span></div>
+              <div className="flex justify-between py-1 border-t border-gray-100"><span>Model listwy:</span><span className="font-bold">{listwa.kod} ({listwa.szerokosc_mm}mm)</span></div>
+              <div className="flex justify-between py-1 border-t border-gray-100"><span>Format obrazu:</span><span className="font-bold">{szerokosc} x {wysokosc} cm</span></div>
+              <div className="flex justify-between py-1 border-t border-gray-100"><span>Oszklenie:</span><span className="font-bold">{nazwaOszklenia}</span></div>
+              <div className="flex justify-between py-1 border-t border-gray-100"><span>Tył:</span><span className="font-bold">{nazwaTylu}</span></div>
+              {maPassepartout && <div className="flex justify-between py-1 border-t border-gray-100"><span>Passe-partout:</span><span className="font-bold">TAK (+{marginesPp} cm)</span></div>}
+              {uwagi && <div className="mt-3 p-2 bg-gray-50 border-l-4 border-gray-300 italic text-xs print:border-black print:bg-gray-50"><strong>Uwagi:</strong> {uwagi}</div>}
             </div>
 
-            <div className="p-8 bg-green-600 rounded-3xl text-white flex flex-col items-center justify-center shadow-lg print:bg-white print:text-black print:border-4 print:border-black print:shadow-none print:rounded-xl">
-              <p className="text-xs font-bold uppercase tracking-widest opacity-80 print:opacity-100 print:text-green-700">DO ZAPŁATY (BRUTTO):</p>
-              <p className="text-6xl font-black my-2 print:text-7xl">{cenaDetaliczna.toFixed(2)} zł</p>
-              <div className="hidden print:block w-full border-t border-black/10 mt-4 pt-2 text-center text-[10px] font-bold uppercase italic">
+            <div className="p-7 bg-green-600 rounded-2xl text-white flex flex-col items-center justify-center shadow-lg print:bg-white print:text-black print:border-4 print:border-black print:shadow-none print:rounded-xl">
+              <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 print:opacity-100 print:text-green-700">DO ZAPŁATY (BRUTTO):</p>
+              <p className="text-5xl font-black my-1 print:text-6xl">{cenaDetaliczna.toFixed(2)} zł</p>
+              <div className="hidden print:block w-full border-t border-black/10 mt-3 pt-1 text-center text-[9px] font-bold uppercase italic">
                  Status płatności: .......................................
               </div>
             </div>
           </div>
 
-          <div className="mt-8 pt-4 border-t border-gray-200 print:hidden opacity-30">
-             <p className="text-[9px] font-bold text-red-500 uppercase mb-2">Poufne: Koszty materiałowe</p>
-             <div className="flex justify-between text-[11px] text-gray-600"><span>Koszt surówki (mb+m2):</span><span>{kosztCalkowityHurt.toFixed(2)} zł</span></div>
-             <div className="flex justify-between text-[11px] text-gray-600"><span>Zysk na marży:</span><span>{(cenaDetaliczna - kosztCalkowityHurt).toFixed(2)} zł</span></div>
+          <div className="mt-6 flex gap-3 print:hidden">
+            <button onClick={handlePrint} className="flex-1 bg-blue-700 text-white font-bold p-3.5 rounded-2xl hover:bg-blue-800 transition shadow-lg active:scale-95">📄 GENERUJ PDF DLA KLIENTA</button>
+            <button onClick={handleSms} className="flex-1 bg-green-500 text-white font-bold p-3.5 rounded-2xl hover:bg-green-600 transition shadow-lg active:scale-95">📱 WYŚLIJ WYCENĘ SMS</button>
           </div>
 
-          <div className="mt-8 flex gap-3 print:hidden">
-            <button onClick={handlePrint} className="flex-1 bg-blue-700 text-white font-bold p-4 rounded-2xl hover:bg-blue-800 transition shadow-lg active:scale-95">📄 GENERUJ PDF DLA KLIENTA</button>
-            <button onClick={handleSms} className="flex-1 bg-green-500 text-white font-bold p-4 rounded-2xl hover:bg-green-600 transition shadow-lg active:scale-95">📱 WYŚLIJ WYCENĘ SMS</button>
-          </div>
-
-          {/* ODCINEK DLA KLIENTA (TYLKO WYDRUK) */}
-          <div className="hidden print:block mt-32 border-t-2 border-dashed border-black pt-10 relative">
+          <div className="hidden print:block mt-24 border-t-2 border-dashed border-black pt-10 relative">
             <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-white px-6 text-2xl">✂️</div>
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-2xl font-black text-blue-900 uppercase leading-none">{shopName}</h3>
-                <p className="text-sm font-bold mt-1 uppercase tracking-tight">POTWIERDZENIE ODBIORU ZLECENIA NR {nrZlecenia}</p>
+                <p className="text-sm font-bold mt-1 uppercase tracking-tight">POTWIERDZENIE ODBIORU NR {nrZlecenia}</p>
                 <div className="mt-8 text-[10px] space-y-0.5 text-gray-600 uppercase font-bold">
                    <p>{shopAddress}</p>
                    <p>Tel: {shopPhone} | {shopEmail}</p>
@@ -215,7 +254,7 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
               </div>
               <div className="text-right">
                 <div className="border-4 border-black p-4 inline-block mb-4 shadow-sm">
-                  <p className="text-[10px] font-bold uppercase mb-1">Cena końcowa:</p>
+                  <p className="text-[10px] font-bold uppercase mb-1">Suma końcowa:</p>
                   <p className="text-5xl font-black">{cenaDetaliczna.toFixed(2)} zł</p>
                 </div>
                 <div className="mt-6 border-t-2 border-black/20 pt-1 w-48 ml-auto text-center">
@@ -223,7 +262,6 @@ const Calculator = ({ listwy = [] }: { listwy: any[] }) => {
                 </div>
               </div>
             </div>
-            <p className="mt-14 text-[9px] text-center uppercase tracking-widest font-black text-gray-400 italic">Dziękujemy za zlecenie! Prosimy o zachowanie tego odcinka przy odbiorze pracy.</p>
           </div>
         </div>
       )}
@@ -251,8 +289,6 @@ export default function App() {
       `}} />
       
       <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden print:shadow-none print:max-w-full print:rounded-none">
-        
-        {/* NAGŁÓWEK EKRANOWY (TYLKO EKRAN) */}
         <header className="bg-gradient-to-r from-blue-800 to-blue-900 p-6 text-white flex justify-between items-center print:hidden">
           <div className="flex items-center gap-3">
              <div className="bg-white p-1 rounded-md shadow-inner">
@@ -260,7 +296,7 @@ export default function App() {
              </div>
              <div>
                 <h1 className="text-xl font-black uppercase tracking-tighter leading-none">Panel Ramiarza</h1>
-                <span className="text-[9px] opacity-60 font-bold uppercase">System Wycen v1.9.4</span>
+                <span className="text-[9px] opacity-60 font-bold uppercase">System Wycen v1.9.8</span>
              </div>
           </div>
           <div className="text-right hidden sm:block">
@@ -271,7 +307,6 @@ export default function App() {
         <div className="p-6 print:p-4">
           <Calculator listwy={listwyDemo} />
           
-          {/* Baza listew - TYLKO EKRAN */}
           <details className="mt-12 group print:hidden text-gray-800 border rounded-xl overflow-hidden shadow-sm">
             <summary className="cursor-pointer p-4 bg-gray-50 border-b font-bold text-sm flex justify-between items-center hover:bg-gray-100 transition-colors">
               <span>📋 Baza materiałowa listew</span>
