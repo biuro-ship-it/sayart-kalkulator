@@ -5,6 +5,7 @@ import { useState } from 'react';
 export default function Calculator({ listwy }: { listwy: any[] }) {
   // 1. ZAMÓWIENIE KLIENTA
   const [wybranaListwaId, setWybranaListwaId] = useState(listwy[0]?.id || '');
+  const [typOprawy, setTypOprawy] = useState('rama'); // 'rama' lub 'listwa'
   const [szerokosc, setSzerokosc] = useState('');
   const [wysokosc, setWysokosc] = useState('');
   const [rodzajOszklenia, setRodzajOszklenia] = useState('float');
@@ -14,7 +15,7 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
   const [marginesPp, setMarginesPp] = useState('5');
   const [cenaPpM2, setCenaPpM2] = useState('80');
 
-  // 2. CENNIK MATERIAŁÓW RAMIARZA (Z domyślnymi cenami hurtowymi za m2)
+  // 2. CENNIK MATERIAŁÓW RAMIARZA
   const [cenaSzkloFloat, setCenaSzkloFloat] = useState('60'); 
   const [cenaSzkloAnty, setCenaSzkloAnty] = useState('90');
   const [cenaPlexi, setCenaPlexi] = useState('120');
@@ -35,6 +36,7 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
   let kosztHurtPp = 0;
   
   let nazwaOszklenia = "";
+  let nazwaOprawy = "";
   let kosztCalkowityHurt = 0;
   let cenaDetaliczna = 0;
 
@@ -56,11 +58,19 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
         w_ramy = w_obrazu;
       }
 
-      // RAMA
+      // RAMA / LISTWA - Obliczanie zużycia
       const listwaSzerCm = listwa.szerokosc_mm / 10;
       const zuzycieCm = 2 * (s_ramy + w_ramy) + (8 * listwaSzerCm);
       zuzycieMb = zuzycieCm / 100;
-      kosztHurtRama = zuzycieMb * listwa.cena_zlozona_hurt;
+
+      // Wybór ceny na podstawie typu oprawy
+      if (typOprawy === 'rama') {
+        kosztHurtRama = zuzycieMb * listwa.cena_zlozona_hurt;
+        nazwaOprawy = "Rama złożona";
+      } else {
+        kosztHurtRama = zuzycieMb * listwa.cena_mb_hurt;
+        nazwaOprawy = "Listwa (z metra)";
+      }
 
       // POWIERZCHNIA M2 (do szkła, pleców i PP)
       poleM2 = (s_ramy * w_ramy) / 10000;
@@ -105,11 +115,12 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
     <div className="mb-4">
       
       {/* SEKCJA 1: WYMIARY I LISTWA */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 bg-blue-50 p-4 rounded">
-        <div className="md:col-span-2 lg:col-span-4 border-b border-blue-200 pb-2 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 bg-blue-50 p-4 rounded">
+        <div className="md:col-span-3 lg:col-span-5 border-b border-blue-200 pb-2 mb-2">
           <h4 className="font-bold text-blue-800 uppercase text-sm tracking-wider">1. Obraz i Rama</h4>
         </div>
-        <div className="lg:col-span-2">
+        
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Wybierz listwę</label>
           <select 
             className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
@@ -121,8 +132,21 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
             ))}
           </select>
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Szerokość obrazu (cm)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Rodzaj oprawy</label>
+          <select 
+            className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
+            value={typOprawy}
+            onChange={(e) => setTypOprawy(e.target.value)}
+          >
+            <option value="rama">Rama (Złożona)</option>
+            <option value="listwa">Listwa (Z metra)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Szerokość (cm)</label>
           <input 
             type="number" 
             className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
@@ -131,8 +155,9 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
             onChange={(e) => setSzerokosc(e.target.value)}
           />
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Wysokość obrazu (cm)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Wysokość (cm)</label>
           <input 
             type="number" 
             className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
@@ -141,7 +166,8 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
             onChange={(e) => setWysokosc(e.target.value)}
           />
         </div>
-        <div className="lg:col-span-2">
+
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Rodzaj Oszklenia</label>
           <select 
             className="w-full p-2 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
@@ -264,7 +290,7 @@ export default function Calculator({ listwy }: { listwy: any[] }) {
             <div className="bg-gray-100 p-5 rounded-lg border border-gray-200 text-sm">
               <p className="text-gray-500 font-bold mb-3 uppercase tracking-wider text-xs border-b border-gray-300 pb-2">Koszty Hurtowe (Materiały)</p>
               <div className="flex justify-between mb-2">
-                <span>Złożona Rama ({zuzycieMb.toFixed(2)} mb):</span>
+                <span>{nazwaOprawy} ({zuzycieMb.toFixed(2)} mb):</span>
                 <strong className="text-gray-800">{kosztHurtRama.toFixed(2)} zł</strong>
               </div>
               <div className="flex justify-between mb-2">
